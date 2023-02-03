@@ -444,13 +444,11 @@ const findPath = () => {
         // console.log(paths)
     }
 
-    setTimeout(() => {
-        loopInterval = setInterval(() => {
-            if (paths.length === 0) return;
-    
-            loop();
-        }, 0);
-    }, 1000);
+    loopInterval = setInterval(() => {
+        if (paths.length === 0) return;
+
+        loop();
+    }, 0);
 
 }
 
