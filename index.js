@@ -1,5 +1,5 @@
 class Canvas {
-    static WIDTH = 900;
+    static WIDTH = 800;
     static HEIGHT = 700;
 
     constructor(canvas) {
@@ -58,8 +58,6 @@ class Canvas {
 
 }
 
-const canvas = new Canvas(document.getElementById("canvas"));
-
 class FieldCreator {
     static EMPTY_CELL_WEIGHT = 1;
 
@@ -76,14 +74,16 @@ class FieldCreator {
         return Array.from({ length: this.height }, () => Array.from({ length: this.width }, () => fill));
     }
 
-    setRandomObstacles(weight = Infinity) {
-        this.obstaclePositions = Array.from({ length: 200 }, () => this.getRadomPosition())
-            .filter(([x, y]) => {
-                const isOnStartPosition = x === this.startPosition[0] && y === this.startPosition[1];
-                const isOnEndPosition = this.isOnEndPosition([x, y]);
+    setRandomObstacles(count = 200, weight = Infinity) {
+        this.obstaclePositions = Array.from({ length: count }, () => this.getRadomPosition());
 
-                return !isOnStartPosition && !isOnEndPosition;
-            });
+        this.obstaclePositions = this.obstaclePositions.filter(position => {
+            const isOnStartPosition = this.isOnStartPosition(position);
+            const isOnEndPosition = this.isOnEndPosition(position);
+
+            return !isOnStartPosition && !isOnEndPosition;
+        });
+            
 
         this.setFieldObstaclesFromPositions(weight);
     }
@@ -101,46 +101,44 @@ class FieldCreator {
     isOnEndPosition([x, y]) {
         return x === this.endPosition[0] && y === this.endPosition[1];
     }
+
+    isOnStartPosition([x, y]) {
+        return x === this.startPosition[0] && y === this.startPosition[1];
+    }
+
+    isOnObstaclePosition([x, y]) {
+        return this.obstaclePositions.some(([obstacleX, obstacleY]) => obstacleX === x && obstacleY === y);
+    }
+        
     
     zeros() {
         return this.createFieldAndFill(0);
     }
 }
 
-const fieldCreator = new FieldCreator(
-    30, 30, 
-    [0, 0], 
-    [21, 22]
-);
-
-// fieldCreator.setRandomObstacles();
-
-const testObstacles = [
-    [1, 0],[1, 1],[1, 2],[1, 3],[1, 4],[1, 5],[1, 6],[1, 7],[1, 8],
-    [1, 9],[1, 10],[1, 11],[1, 12],[4, 4],[4, 5],[4, 6],[4, 7],[4, 8],
-    [4, 9],[4, 10],[4, 11],[4, 12],[4, 13],[4, 14],[4, 15],[4, 16],[4, 17],
-    [4, 18],[4, 19],[4, 20],[4, 21],[4, 22],[4, 23],[4, 24],[4, 25],[4, 26],
-    [4, 27],[4, 28],[4, 29],[7, 0],[7, 1],[7, 2],[7, 3],[7, 4],[7, 5],[7, 6],
-    [7, 7],[7, 8],[7, 9],[7, 10],[7, 11],[7, 12],[7, 13],[7, 14],[7, 15],[7, 16],[7, 17],
-    [7, 18],[7, 19],[7, 20],[7, 21],[7, 22],[7, 23],[10, 10],[10, 11],
-    [10, 12],[10, 13],[10, 14],[10, 15],[10, 16],[10, 17],[10, 18],
-    [10, 19],[10, 20],[10, 21],[10, 22],[10, 23],[11, 23],[12, 23],[12, 24],[12, 25],[13, 25],
-    [14, 25],[14, 26],[14, 27],[14, 27],[14, 28],[13, 28],[13, 29],[12, 29],[11, 29],
-    ...Array.from({ length: 24 }, (_, i) => [14, i]),
-    ...Array.from({ length: 28 }, (_, i) => [18, 2 + i]),
-    ...Array.from({ length: 26 }, (_, i) => [24, 2 + i]),
-    ...Array.from({ length: 8 }, (_, i) => [19 + i, 17]),
-];
-
-fieldCreator.obstaclePositions = testObstacles;
-fieldCreator.setFieldObstaclesFromPositions();
-
-
 class FieldWalker {
-    constructor(field) {
-        this.field = field;
-        // Set
-        this.visited = [];
+    constructor(fieldCreator) {
+        this.field = fieldCreator.field;
+        this.visited = new Int8Array(fieldCreator.field.length * fieldCreator.field[0].length);
+    }
+
+    init() {
+        this.visited.fill(0);
+    }
+
+    getVisitedPossitions = () => {
+        const possitions = [];
+    
+        for (let i = 0; i < this.visited.length; i++) {
+           if (this.visited[i] !== 0) {
+                const x = i % this.field[0].length;
+                const y = Math.floor(i / this.field.length)
+    
+                possitions.push([x, y]);
+           }
+        }
+    
+        return possitions;
     }
 
     getRightTopDiagonal(position, rWeight = 0, tWeight = 0) {
@@ -297,7 +295,7 @@ class FieldWalker {
     }
 
     getAviableDirections(position) {
-        const isVisited = this.visited.some(visited => visited[0] === position[0] && visited[1] === position[1]);
+        const isVisited = this.visited[position[0] + position[1] * this.field[0].length];
         
         const result = []
 
@@ -305,7 +303,7 @@ class FieldWalker {
             return result;
         }
 
-        this.visited.push(position);
+        this.visited[position[0] + position[1] * this.field[0].length] = 1;
 
         const up = this.getUp(position);
         const down = this.getDown(position);
@@ -334,12 +332,10 @@ class FieldWalker {
 
             const [x, y] = node.direction;
 
-            return !this.visited.some(visited => visited[0] === x && visited[1] === y);
+            return !this.visited[x + y * this.field[0].length];
         })
     }
 }
-
-
 
 class FieldDrawer {
     static VISITED = 'visited';
@@ -363,38 +359,36 @@ class FieldDrawer {
         this.field = fieldCreator.zeros();
     }
 
-    setVisited(visited) {
-        visited.forEach(position => {
+    fillField(positions, fill) {
+        positions.forEach(position => {
             const [x, y] = position;
-            this.field[y][x] = FieldDrawer.VISITED;
+
+            this.field[y][x] = fill;
         });
+
+        return this;
+    }
+
+    setVisited(visited) {
+        this.fillField(visited, FieldDrawer.VISITED);
 
         return this;
     }
 
     setPath(path) {
-        path.forEach(position => {
-            const [x, y] = position;
-            this.field[y][x] = FieldDrawer.PATH;
-        });
+        this.fillField(path, FieldDrawer.PATH);
 
         return this;
     }
 
     setObstaclePositions(obstaclePositions) {
-        obstaclePositions.forEach(position => {
-            const [x, y] = position;
-            this.field[y][x] = FieldDrawer.OBSTACLE;
-        });
+        this.fillField(obstaclePositions, FieldDrawer.OBSTACLE);
 
         return this;
     }
-
+    
     setPossiblePaths(possiblePaths) {
-        possiblePaths.forEach(position => {
-            const [x, y] = position;
-            this.field[y][x] = FieldDrawer.POSSIBLE_PATHS;
-        });
+        this.fillField(possiblePaths, FieldDrawer.POSSIBLE_PATHS);
 
         return this;
     }
@@ -406,11 +400,16 @@ class FieldDrawer {
         return this;
     }
 
+
     setEndPosition(endPosition) {
         const [x, y] = endPosition;
         this.field[y][x] = FieldDrawer.END;
 
         return this;
+    }
+
+    clearField() {
+        this.field = this.fieldCreator.zeros();
     }
 
     draw() {
@@ -437,7 +436,7 @@ class FieldDrawer {
                 }
     
                 if (cell === FieldDrawer.PATH) {
-                    fillColor = { r: 0, g: 191, b: 255 };
+                    fillColor = { r: 100, g: 255, b: 0 };
     
                 }
     
@@ -454,7 +453,7 @@ class FieldDrawer {
                 }
     
                 if (cell === FieldDrawer.END) {
-                    fillColor = { r: 25, g: 255, b: 85 };
+                    fillColor = { r: 205, g: 55, b: 85 };
                 }
                 
                 if (fillColor) {
@@ -466,7 +465,6 @@ class FieldDrawer {
 
 }
 
-
 class PathFinder {
     static manhettenDistance = (a, b) => {
         const [ax, ay] = a;
@@ -475,55 +473,115 @@ class PathFinder {
         return Math.abs(ax - bx) + Math.abs(ay - by);
     }
 
-    constructor(fieldCreator) {
-        this.fieldCreator = fieldCreator;
-        this.fieldWalker = new FieldWalker(fieldCreator.field); 
-        this.paths = this.fieldWalker.getAviableDirections(this.fieldCreator.startPosition).map(node => [node]);
-        this.onFinish = () => {};
+    constructor(fieldCreator, fieldDrawer, fieldWalker) {
+        this.heuristics = PathFinder.manhettenDistance;
 
+        this.fieldCreator = fieldCreator;
+        this.fieldDrawer = fieldDrawer;
+        this.fieldWalker = fieldWalker; 
+
+        this.paths = [];
+        this.minPathIndex = null;
+        this.isFinished = false;
+        this.isStarted = false;
+
+        this.init();
+    }
+
+    init() {
+        this.paths = this.fieldWalker.getAviableDirections(this.fieldCreator.startPosition).map(node => [node]);
         this.minPathIndex = null;
         this.isFinished = false;
     }
 
-    findPath() {
-        let loopInterval = null;
+    setMinPathIndex() {
+        let minPathIndex = null;
+        let minPathLength = Infinity;
 
-        loopInterval = setInterval(() => {
-            if (this.paths.length === 0) return;
-    
-            this.loop();
-        });
+        for (let i = 0; i < this.paths.length; i++) {
+            const path = this.paths[i];
+            const lastNode = path[path.length - 1];
+            const pathLength = path.length + this.heuristics(lastNode.direction, this.fieldCreator.endPosition);
 
-        this.onFinish = () => {
-            this.isFinished = true;
-
-            console.log(`Total path length: ${this.paths[this.minPathIndex].length}`);
-
-            clearInterval(loopInterval);
+            if (pathLength < minPathLength) {
+                minPathIndex = i;
+                minPathLength = pathLength;
+            }
         }
+
+        this.minPathIndex = minPathIndex;
     }
 
-    setMinPathIndex(heuristics = PathFinder.manhettenDistance) {
-        const pathWeighsSum = this.paths.map(path => path.reduce((acc, node) => {
-            return acc + node.weight;
-        }, 0) + heuristics(path[path.length - 1].direction, this.fieldCreator.endPosition));
+    findPath(animate = false) {
 
-        this.minPathIndex = pathWeighsSum.indexOf(Math.min(...pathWeighsSum));
-    }
+        // let startTime = performance.now();
 
-    loop = () => {
-        this.setMinPathIndex()
+        if (animate) {
+            let loopInterval = null;
 
-        const minPath = this.paths[this.minPathIndex];
+            loopInterval = setInterval(() => {
+                this.loop();
+                this.displayChanges();
+                
+                if (this.isFinished) {
+                    clearInterval(loopInterval);
+                    return;
+                }
+            });
 
-        const minPathTail = minPath[minPath.length - 1];
+            return;
+        }
+
+        const startTime = performance.now();
+
+        let iterations = 0;
+
+        while (!this.isFinished) {
+            this.loop();
+            iterations++;
+        }
 
         this.displayChanges();
 
+        console.log('path length', this.getMinPath().length);
+        console.log('iterations', iterations);
+        console.log('time', performance.now() - startTime);
+    }
+
+    indexOfMinimum(array) {
+        if (array.length === 0) {
+            return -1;
+        }
+
+        let minValue = array[0];
+        let minIndex = 0;
+
+        for (let i = 1; i < array.length; i++) {
+            if (array[i] < minValue) {
+                minIndex = i;
+                minValue = array[i];
+            }
+        }
+
+        return minIndex;
+    }
+
+    loop = () => {
+        if (this.paths.length === 0) {
+            this.isFinished = true;
+            return;
+        }
+
+        this.setMinPathIndex();
+
+        const minPath = this.getMinPath();
+
+        const minPathTail = minPath[minPath.length - 1];
 
         if (this.fieldCreator.isOnEndPosition(minPathTail.direction)) {
-            this.onFinish();
-            
+            this.stopLoop();
+            this.keepOnlyMinPath();
+
             return;
         }
 
@@ -534,19 +592,136 @@ class PathFinder {
         this.paths.splice(this.minPathIndex, 1, ...nextPaths);
     }
 
-    displayChanges() {
-        const minPath = this.paths[this.minPathIndex];
+    stopLoop() {
+        this.isFinished = true;
+    }
 
-        new FieldDrawer(
-            canvas,
-            this.fieldCreator,
-        ).setVisited(this.fieldWalker.visited)
-        .setObstaclePositions(this.fieldCreator.obstaclePositions)
-        .setPath(minPath.map(node => node.direction))
-        .setEndPosition(this.fieldCreator.endPosition)
-        .setStartPosition(this.fieldCreator.startPosition)
-        .draw();
+    keepOnlyMinPath() {
+        const minPath = this.getMinPath();
+
+        this.paths.length = 0;
+        this.paths.push(minPath);
+        this.minPathIndex = 0;
+    }
+
+    displayChanges() {
+        const minPath = this.getMinPath();
+
+        this.fieldDrawer.clearField();
+
+        this.fieldDrawer
+            .setVisited(this.fieldWalker.getVisitedPossitions())
+            .setObstaclePositions(this.fieldCreator.obstaclePositions)
+            .setStartPosition(this.fieldCreator.startPosition)
+            .setPossiblePaths(this.paths.flat().map(node => node.direction))
+            .setPath(minPath.map(node => node.direction))
+            .setEndPosition(this.fieldCreator.endPosition)
+            .draw();
+    }
+
+    getMinPath() {
+        return this.paths[this.minPathIndex] || [];
     }
 }
 
-new PathFinder(fieldCreator).findPath();
+const canvas = new Canvas(document.getElementById("canvas"));
+
+
+const fieldCreator = new FieldCreator(
+    60, 60, 
+    [0, 0], 
+    [21, 22]
+);
+
+fieldCreator.setRandomObstacles(1000);
+
+// const testObstacles = [
+//     [1, 0],[1, 1],[1, 2],[1, 3],[1, 4],[1, 5],[1, 6],[1, 7],[1, 8],
+//     [1, 9],[1, 10],[1, 11],[1, 12],[4, 4],[4, 5],[4, 6],[4, 7],[4, 8],
+//     [4, 9],[4, 10],[4, 11],[4, 12],[4, 13],[4, 14],[4, 15],[4, 16],[4, 17],
+//     [4, 18],[4, 19],[4, 20],[4, 21],[4, 22],[4, 23],[4, 24],[4, 25],[4, 26],
+//     [4, 27],[4, 28],[4, 29],[7, 0],[7, 1],[7, 2],[7, 3],[7, 4],[7, 5],[7, 6],
+//     [7, 7],[7, 8],[7, 9],[7, 10],[7, 11],[7, 12],[7, 13],[7, 14],[7, 15],[7, 16],[7, 17],
+//     [7, 18],[7, 19],[7, 20],[7, 21],[7, 22],[7, 23],[10, 10],[10, 11],
+//     [10, 12],[10, 13],[10, 14],[10, 15],[10, 16],[10, 17],[10, 18],
+//     [10, 19],[10, 20],[10, 21],[10, 22],[10, 23],[11, 23],[12, 23],[12, 24],[12, 25],[13, 25],
+//     [14, 25],[14, 26],[14, 27],[14, 27],[14, 28],[13, 28],[13, 29],[12, 29],[11, 29],
+//     ...Array.from({ length: 24 }, (_, i) => [14, i]),
+//     ...Array.from({ length: 28 }, (_, i) => [18, 2 + i]),
+//     ...Array.from({ length: 26 }, (_, i) => [24, 2 + i]),
+//     ...Array.from({ length: 8 }, (_, i) => [19 + i, 17]),
+// ];
+
+// fieldCreator.obstaclePositions = testObstacles;
+// fieldCreator.setFieldObstaclesFromPositions();
+
+const fieldDrawer = new FieldDrawer(canvas, fieldCreator);
+const fieldWalker = new FieldWalker(fieldCreator);
+
+const pathFinder = new PathFinder(fieldCreator, fieldDrawer, fieldWalker);
+
+pathFinder.findPath();
+
+
+const getPossitionFromMouse = (e) => {
+    const { offsetX, offsetY } = e;
+    const { WIDTH, HEIGHT } = Canvas;
+    const cellWidth = WIDTH / fieldCreator.field[0].length;
+    const cellHeight = HEIGHT / fieldCreator.field.length;
+
+    const x = Math.floor(offsetX / cellWidth);
+    const y = Math.floor(offsetY / cellHeight);
+
+    return [x, y];
+}
+
+
+let mousePosition = [0, 0];
+
+canvas.canvas.onmousemove = (e) => {
+    const position = getPossitionFromMouse(e);
+
+    if (!pathFinder.isFinished) {
+        return;
+    }
+
+    const isMouseChangedPossition = mousePosition[0] === position[0] && mousePosition[1] === position[1]
+
+    if (isMouseChangedPossition) {
+        return;
+    }
+
+    if (fieldCreator.isOnObstaclePosition(position)) {
+        return;
+    }
+
+    mousePosition = position;
+
+    fieldCreator.endPosition = position;
+
+    fieldWalker.init();
+    pathFinder.init();
+
+    pathFinder.findPath();
+}
+
+canvas.canvas.onmousedown = (e) => {
+    const position = getPossitionFromMouse(e);
+
+    if (!pathFinder.isFinished) {
+        return;
+    }
+
+
+    if (fieldCreator.isOnObstaclePosition(position)) {
+        return;
+    }
+    mousePosition = position;
+
+    fieldCreator.endPosition = position;
+
+    fieldWalker.init();
+    pathFinder.init();
+
+    pathFinder.findPath(true);
+}
