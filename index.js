@@ -34,7 +34,7 @@ class Canvas {
     }
     drawText(x, y, text) {
         this.ctx.font = "24px serif";
-        this.ctx.fillText(text, x + 20, y + 20);
+        this.ctx.fillText(text, x + 30, y + 20);
     }
     drawRect(x, y, width, height, fillColor={}) {       
         this.ctx.beginPath();
@@ -60,194 +60,182 @@ class Canvas {
 
 const canvas = new Canvas(document.getElementById("canvas"));
 
-const createField = (w, h, fill = 0) => Array.from({ length: h }, () => Array.from({ length: w }, () => fill));
+class FieldCreator {
+    static EMPTY_CELL_WEIGHT = 1;
 
+    constructor(width, height, startPosition, endPosition) {
+        this.width = width;
+        this.height = height;
+        this.startPosition = startPosition || this.getRadomPosition();
+        this.endPosition = endPosition || this.getRadomPosition();
+        this.field = this.createFieldAndFill();
+        this.obstaclePositions = [];
+    }
 
-const startPosition = [0, 0];
-const endPosition = [20, 20];
+    createFieldAndFill(fill = FieldCreator.EMPTY_CELL_WEIGHT) {
+        return Array.from({ length: this.height }, () => Array.from({ length: this.width }, () => fill));
+    }
 
-const field = createField(30, 30, 1);
+    setRandomObstacles(weight = Infinity) {
+        this.obstaclePositions = Array.from({ length: 200 }, () => this.getRadomPosition())
+            .filter(([x, y]) => {
+                const isOnStartPosition = x === this.startPosition[0] && y === this.startPosition[1];
+                const isOnEndPosition = this.isOnEndPosition([x, y]);
 
+                return !isOnStartPosition && !isOnEndPosition;
+            });
 
-const obstaclePositions = [
-    [1, 0],
-    [1, 1],
-    [1, 2],
-    [1, 3],
-    [1, 4],
-    [1, 5],
-    [1, 6],
-    [1, 7],
-    [1, 8],
-    [1, 9],
-    [1, 10],
-    [1, 11],
-    [1, 12],
-    [4, 4],
-    [4, 5],
-    [4, 6],
-    [4, 7],
-    [4, 8],
-    [4, 9],
-    [4, 10],
-    [4, 11],
-    [4, 12],
-    [4, 13],
-    [4, 14],
-    [4, 15],
-    [4, 16],
-    [4, 17],
-    [4, 18],
-    [4, 19],
-    [4, 20],
-    [4, 21],
-    [4, 22],
-    [4, 23],
-    [4, 24],
-    [4, 25],
-    [4, 26],
-    [4, 27],
-    [4, 28],
-    [4, 29],
-    [7, 0],
-    [7, 1],
-    [7, 2],
-    [7, 3],
-    [7, 4],
-    [7, 5],
-    [7, 6],
-    [7, 7],
-    [7, 8],
-    [7, 9],
-    [7, 10],
-    [7, 11],
-    [7, 12],
-    [7, 13],
-    [7, 14],
-    [7, 15],
-    [7, 16],
-    [7, 17],
-    [7, 18],
-    [7, 19],
-    [7, 20],
-    [7, 21],
-    [7, 22],
-    [7, 23],
-    [10, 10],
-    [10, 11],
-    [10, 12],
-    [10, 13],
-    [10, 14],
-    [10, 15],
-    [10, 16],
-    [10, 17],
-    [10, 18],
-    [10, 19],
-    [10, 20],
-    [10, 21],
-    [10, 22],
-    [10, 23],
-    [11, 23],
-    [12, 23],
-    [12, 24],
-    [12, 25],
-    [13, 25],
-    [14, 25],
-    [14, 26],
-    [14, 27],
-    [14, 27],
-    [14, 28],
-    [13, 28],
-    [13, 29],
-    [12, 29],
-    [11, 29],
+        this.setFieldObstaclesFromPositions(weight);
+    }
+
+    setFieldObstaclesFromPositions(weight = Infinity) {
+        this.field = this.createFieldAndFill();
+
+        this.obstaclePositions.forEach(([x, y]) => this.field[y][x] = weight);
+    }
+
+    getRadomPosition() {
+        return [Math.floor(Math.random() * this.width), Math.floor(Math.random() * this.height)];
+    }
+
+    isOnEndPosition([x, y]) {
+        return x === this.endPosition[0] && y === this.endPosition[1];
+    }
+    
+    zeros() {
+        return this.createFieldAndFill(0);
+    }
+}
+
+const fieldCreator = new FieldCreator(
+    30, 30, 
+    [0, 0], 
+    [21, 22]
+);
+
+// fieldCreator.setRandomObstacles();
+
+const testObstacles = [
+    [1, 0],[1, 1],[1, 2],[1, 3],[1, 4],[1, 5],[1, 6],[1, 7],[1, 8],
+    [1, 9],[1, 10],[1, 11],[1, 12],[4, 4],[4, 5],[4, 6],[4, 7],[4, 8],
+    [4, 9],[4, 10],[4, 11],[4, 12],[4, 13],[4, 14],[4, 15],[4, 16],[4, 17],
+    [4, 18],[4, 19],[4, 20],[4, 21],[4, 22],[4, 23],[4, 24],[4, 25],[4, 26],
+    [4, 27],[4, 28],[4, 29],[7, 0],[7, 1],[7, 2],[7, 3],[7, 4],[7, 5],[7, 6],
+    [7, 7],[7, 8],[7, 9],[7, 10],[7, 11],[7, 12],[7, 13],[7, 14],[7, 15],[7, 16],[7, 17],
+    [7, 18],[7, 19],[7, 20],[7, 21],[7, 22],[7, 23],[10, 10],[10, 11],
+    [10, 12],[10, 13],[10, 14],[10, 15],[10, 16],[10, 17],[10, 18],
+    [10, 19],[10, 20],[10, 21],[10, 22],[10, 23],[11, 23],[12, 23],[12, 24],[12, 25],[13, 25],
+    [14, 25],[14, 26],[14, 27],[14, 27],[14, 28],[13, 28],[13, 29],[12, 29],[11, 29],
     ...Array.from({ length: 24 }, (_, i) => [14, i]),
     ...Array.from({ length: 28 }, (_, i) => [18, 2 + i]),
     ...Array.from({ length: 26 }, (_, i) => [24, 2 + i]),
     ...Array.from({ length: 8 }, (_, i) => [19 + i, 17]),
-    
 ];
 
-obstaclePositions.forEach(([x, y]) => field[y][x] = Infinity);
+fieldCreator.obstaclePositions = testObstacles;
+fieldCreator.setFieldObstaclesFromPositions();
 
 
 class FieldWalker {
     constructor(field) {
         this.field = field;
+        // Set
         this.visited = [];
     }
 
-    getRightTopDiagonal(position) {
+    getRightTopDiagonal(position, rWeight = 0, tWeight = 0) {
         const [x, y] = position;
 
         const result = {
             direction: [x + 1, y - 1],
-            weight: Infinity,
+            weight: 0,
+            isUndefined: false,
         }
 
         if (this.field[y - 1] && this.field[y - 1][x + 1] != undefined) {
-            result.weight = this.field[y - 1][x + 1] * 1.4;
+            const neighborWeights = (rWeight + tWeight - FieldCreator.EMPTY_CELL_WEIGHT*2) / 2;
+
+            result.weight = this.field[y - 1][x + 1] * Math.SQRT2 + neighborWeights;
+        } else {
+            result.isUndefined = true;
         }
 
         return result;
     }
 
-    getLeftTopDiagonal(position) {
+    getLeftTopDiagonal(position, lWeight = 0, tWeight = 0) {
         const [x, y] = position;
 
         const result = {
             direction: [x - 1, y - 1],
-            weight: Infinity,
+            weight: 0,
+            isUndefined: false,
         }
 
         if (this.field[y - 1] && this.field[y - 1][x - 1] != undefined) {
-            result.weight = this.field[y - 1][x - 1] * 1.4;
+            const neighborWeights = (lWeight + tWeight - FieldCreator.EMPTY_CELL_WEIGHT*2) / 2;
+            
+            result.weight = this.field[y - 1][x - 1] * Math.SQRT2 + neighborWeights;
+        } else {
+            result.isUndefined = true;
         }
 
         return result;
     }
 
-    getRightBottomDiagonal(position) {
+    getRightBottomDiagonal(position, rWeight = 0, bWeight = 0) {
         const [x, y] = position;
 
         const result = {
             direction: [x + 1, y + 1],
-            weight: Infinity,
+            weight: 0,
+            isUndefined: false,
         }
 
         if (this.field[y + 1] && this.field[y + 1][x + 1] != undefined) {
-            result.weight = this.field[y + 1][x + 1] * 1.4;
+            const neighborWeights = (rWeight + bWeight - FieldCreator.EMPTY_CELL_WEIGHT*2) / 2;
+
+            result.weight = this.field[y + 1][x + 1] * Math.SQRT2 + neighborWeights;
+        } else {
+            result.isUndefined = true;
         }
 
         return result;
     }
 
-    getLeftBottomDiagonal(position) {
+    getLeftBottomDiagonal(position, lWeight = 0, bWeight = 0) {
         const [x, y] = position;
 
         const result = {
             direction: [x - 1, y + 1],
-            weight: Infinity,
+            weight: 0,
+            isUndefined: false,
         }
 
         if (this.field[y + 1] && this.field[y + 1][x - 1] != undefined) {
-            result.weight = this.field[y + 1][x - 1] * 1.4;
+            const neighborWeights = (lWeight + bWeight - FieldCreator.EMPTY_CELL_WEIGHT*2) / 2;
+
+            result.weight = this.field[y + 1][x - 1] * Math.SQRT2 + neighborWeights;
+        } else {
+            result.isUndefined = true;
         }
 
         return result;
     }
 
-    
     getUp(position) {
         const [x, y] = position;
 
         const result = {
             direction: [x, y - 1],
-            weight: Infinity,
+            weight: 0,
+            isUndefined: false,
         }
 
         if (this.field[y - 1] && this.field[y - 1][x] != undefined) {
             result.weight = this.field[y - 1][x];
+        } else {
+            result.isUndefined = true;
         }
 
         return result;
@@ -258,11 +246,14 @@ class FieldWalker {
 
         const result = {
             direction: [x, y + 1],
-            weight: Infinity,
+            weight: 0,
+            isUndefined: false,
         }
 
         if (this.field[y + 1] && this.field[y + 1][x] != undefined) {
             result.weight = this.field[y + 1][x];
+        } else {
+            result.isUndefined = true;
         }
 
         return result;
@@ -274,11 +265,14 @@ class FieldWalker {
 
         const result = {
             direction: [x - 1, y],
-            weight: Infinity,
+            weight: 0,
+            isUndefined: false,
         }
 
         if (this.field[y] && this.field[y][x - 1] != undefined) {
             result.weight = this.field[y][x - 1];
+        } else {
+            result.isUndefined = true;
         }
 
         return result;
@@ -289,11 +283,14 @@ class FieldWalker {
 
         const result = {
             direction: [x + 1, y],
-            weight: Infinity,
+            weight: 0,
+            isUndefined: false,
         }
 
         if (this.field[y] && this.field[y][x + 1] != undefined) {
             result.weight = this.field[y][x + 1];
+        } else {
+            result.isUndefined = true;
         }
 
         return result;
@@ -302,22 +299,35 @@ class FieldWalker {
     getAviableDirections(position) {
         const isVisited = this.visited.some(visited => visited[0] === position[0] && visited[1] === position[1]);
         
+        const result = []
+
         if (isVisited) {
-            return [];
+            return result;
         }
 
         this.visited.push(position);
 
-        return [
-            this.getRightTopDiagonal(position),
-            this.getLeftTopDiagonal(position),
-            this.getRightBottomDiagonal(position),
-            this.getLeftBottomDiagonal(position),
-            this.getUp(position),
-            this.getDown(position),
-            this.getLeft(position),
-            this.getRight(position),
-        ].filter(node => {
+        const up = this.getUp(position);
+        const down = this.getDown(position);
+        const left = this.getLeft(position);
+        const right = this.getRight(position);
+
+        result.push(up);
+        result.push(down);
+        result.push(left);
+        result.push(right);
+        result.push(this.getLeftTopDiagonal(position, left.weight, up.weight));
+        result.push(this.getRightTopDiagonal(position, right.weight, up.weight));
+        result.push(this.getLeftBottomDiagonal(position, left.weight, down.weight));
+        result.push(this.getRightBottomDiagonal(position, right.weight, down.weight));
+
+        return result.filter(node => {
+            // filter undefined nodes
+            if (node.isUndefined) {
+                return false;
+            }
+
+            // filter unreachable nodes
             if (node.weight === Infinity) {
                 return false;
             }
@@ -325,135 +335,218 @@ class FieldWalker {
             const [x, y] = node.direction;
 
             return !this.visited.some(visited => visited[0] === x && visited[1] === y);
-        });
+        })
     }
 }
 
-const drawField = (canvas, field) => {
-    const { WIDTH, HEIGHT } = Canvas;
-    const cellWidth = WIDTH / field[0].length;
-    const cellHeight = HEIGHT / field.length;
 
-    for (let i = 0; i < field.length; i++) {
-        for (let j = 0; j < field[i].length; j++) {
-            const cell = field[i][j];
-            let fillColor = null;
 
-            if (cell === 'visited') {
-                // fillColor = { r: 200, g: 200, b: 200 };
-                canvas.strokeRect(j * cellWidth, i * cellHeight, cellWidth, cellHeight, { r: 0, g: 0, b: 0}, 0.5);    
-            }
+class FieldDrawer {
+    static VISITED = 'visited';
+    static PATH = 'path';
+    static OBSTACLE = 'obstacle';
+    static POSSIBLE_PATHS = 'possible_paths';
+    static START = 'start';
+    static END = 'end';
 
-            if (cell === 'path') {
-                fillColor = { r: 0, g: 191, b: 255 };
-            }
+    constructor(
+        canvas,
+        fieldCreator,
+    ) {
+        this.canvas = canvas;
+        this.fieldCreator = fieldCreator;
 
-            if (cell === 'obstacle') {
-                fillColor = { r: 0, g: 0, b: 0 };
-            }
+        this.visited = [];
+        this.path = [];
+        this.obstaclePositions = [];
 
-            if (i === startPosition[1] && j === startPosition[0]) {
-                fillColor = { r: 34, g: 224, b: 22 };
-            }
-
-            if (i === endPosition[1] && j === endPosition[0]) {
-                fillColor = { r: 25, g: 255, b: 85 };
-            }
-            
-            if (fillColor) {
-                canvas.drawRect(j * cellWidth, i * cellHeight, cellWidth, cellHeight, fillColor);
-            }
-        }
+        this.field = fieldCreator.zeros();
     }
-}
 
-const drawGrid = (canvas, grid) => {
-    const { WIDTH, HEIGHT } = Canvas;
-    const cellWidth = WIDTH / grid[0].length;
-    const cellHeight = HEIGHT / grid.length;
+    setVisited(visited) {
+        visited.forEach(position => {
+            const [x, y] = position;
+            this.field[y][x] = FieldDrawer.VISITED;
+        });
 
-    for (let i = 0; i < grid.length; i++) {
-        for (let j = 0; j < grid[i].length; j++) {
-            canvas.strokeRect(j * cellWidth, i * cellHeight, cellWidth, cellHeight, { r: 0, g: 0, b: 255}, 0.2);
-        }
+        return this;
     }
-}
 
-const manhettenDistance = (a, b) => {
-    const [ax, ay] = a;
-    const [bx, by] = b;
-
-    return Math.abs(ax - bx) + Math.abs(ay - by);
-}
-
-
-const findPath = () => {
-    const fw = new FieldWalker(field);
-
-    const paths = fw.getAviableDirections(startPosition).map(node => [node]);
-    let loopInterval = null;
-
-    const loop = () => {
-        const pathWeighsSum = paths.map(path => path.reduce((acc, node) => {
-            return acc + node.weight + manhettenDistance(node.direction, endPosition);
-        }, 0));
-        const minPathIndex = pathWeighsSum.indexOf(Math.min(...pathWeighsSum));
-
-        const path = paths[minPathIndex];
-
-        const tail = path[path.length - 1];
-
-        const fieldMap = createField(field[0].length, field.length);
-
-        fw.visited.forEach(visited => {
-            const [x, y] = visited;
-
-            fieldMap[y][x] = 'visited';
+    setPath(path) {
+        path.forEach(position => {
+            const [x, y] = position;
+            this.field[y][x] = FieldDrawer.PATH;
         });
 
-        path.forEach(node => {
-            const [x, y] = node.direction;
+        return this;
+    }
 
-            fieldMap[y][x] = 'path';
+    setObstaclePositions(obstaclePositions) {
+        obstaclePositions.forEach(position => {
+            const [x, y] = position;
+            this.field[y][x] = FieldDrawer.OBSTACLE;
         });
 
-        obstaclePositions.forEach(obstacle => {
-            const [x, y] = obstacle;
+        return this;
+    }
 
-            fieldMap[y][x] = 'obstacle';
+    setPossiblePaths(possiblePaths) {
+        possiblePaths.forEach(position => {
+            const [x, y] = position;
+            this.field[y][x] = FieldDrawer.POSSIBLE_PATHS;
         });
 
+        return this;
+    }
+
+    setStartPosition(startPosition) {
+        const [x, y] = startPosition;
+        this.field[y][x] = FieldDrawer.START;
+
+        return this;
+    }
+
+    setEndPosition(endPosition) {
+        const [x, y] = endPosition;
+        this.field[y][x] = FieldDrawer.END;
+
+        return this;
+    }
+
+    draw() {
         canvas.clear();
 
-        // drawGrid(canvas, field);
-        drawField(canvas, fieldMap);
+        this.drawField();
 
-        if (tail.direction[0] === endPosition[0] && tail.direction[1] === endPosition[1]) {
-            
-            console.log((`Total path length: ${path.length}`))
+        return this;
+    }
+
+    drawField = () => {
+        const { WIDTH, HEIGHT } = Canvas;
+        const cellWidth = WIDTH / this.field[0].length;
+        const cellHeight = HEIGHT / this.field.length;
+    
+        for (let i = 0; i < this.field.length; i++) {
+            for (let j = 0; j < this.field[i].length; j++) {
+                const cell = this.field[i][j];
+                let fillColor = null;
+    
+                if (cell === FieldDrawer.VISITED) {
+                    // fillColor = { r: 200, g: 200, b: 200 };
+                    this.canvas.strokeRect(j * cellWidth, i * cellHeight, cellWidth, cellHeight, { r: 0, g: 0, b: 0}, 0.5);    
+                }
+    
+                if (cell === FieldDrawer.PATH) {
+                    fillColor = { r: 0, g: 191, b: 255 };
+    
+                }
+    
+                if (cell === FieldDrawer.OBSTACLE) {
+                    fillColor = { r: 0, g: 0, b: 0 };
+                }
+    
+                if (cell === FieldDrawer.POSSIBLE_PATHS) {
+                    fillColor = { r: 12, g: 140, b: 255 };
+                }
+    
+                if (cell === FieldDrawer.START) {
+                    fillColor = { r: 34, g: 224, b: 22 };
+                }
+    
+                if (cell === FieldDrawer.END) {
+                    fillColor = { r: 25, g: 255, b: 85 };
+                }
+                
+                if (fillColor) {
+                    this.canvas.drawRect(j * cellWidth, i * cellHeight, cellWidth, cellHeight, fillColor);
+                }
+            }
+        }
+    }
+
+}
+
+
+class PathFinder {
+    static manhettenDistance = (a, b) => {
+        const [ax, ay] = a;
+        const [bx, by] = b;
+    
+        return Math.abs(ax - bx) + Math.abs(ay - by);
+    }
+
+    constructor(fieldCreator) {
+        this.fieldCreator = fieldCreator;
+        this.fieldWalker = new FieldWalker(fieldCreator.field); 
+        this.paths = this.fieldWalker.getAviableDirections(this.fieldCreator.startPosition).map(node => [node]);
+        this.onFinish = () => {};
+
+        this.minPathIndex = null;
+        this.isFinished = false;
+    }
+
+    findPath() {
+        let loopInterval = null;
+
+        loopInterval = setInterval(() => {
+            if (this.paths.length === 0) return;
+    
+            this.loop();
+        });
+
+        this.onFinish = () => {
+            this.isFinished = true;
+
+            console.log(`Total path length: ${this.paths[this.minPathIndex].length}`);
 
             clearInterval(loopInterval);
         }
-
-        const nextNodes = fw.getAviableDirections(tail.direction);
-
-        const nextPaths = nextNodes.map(node => [...path, node]);
-
-        paths.splice(minPathIndex, 1, ...nextPaths);
-        
-        // console.log(paths)
     }
 
-    loopInterval = setInterval(() => {
-        if (paths.length === 0) return;
+    setMinPathIndex(heuristics = PathFinder.manhettenDistance) {
+        const pathWeighsSum = this.paths.map(path => path.reduce((acc, node) => {
+            return acc + node.weight;
+        }, 0) + heuristics(path[path.length - 1].direction, this.fieldCreator.endPosition));
 
-        loop();
-    }, 0);
+        this.minPathIndex = pathWeighsSum.indexOf(Math.min(...pathWeighsSum));
+    }
 
+    loop = () => {
+        this.setMinPathIndex()
+
+        const minPath = this.paths[this.minPathIndex];
+
+        const minPathTail = minPath[minPath.length - 1];
+
+        this.displayChanges();
+
+
+        if (this.fieldCreator.isOnEndPosition(minPathTail.direction)) {
+            this.onFinish();
+            
+            return;
+        }
+
+        const nextNodes = this.fieldWalker.getAviableDirections(minPathTail.direction);
+
+        const nextPaths = nextNodes.map(node => [...minPath, node]);
+
+        this.paths.splice(this.minPathIndex, 1, ...nextPaths);
+    }
+
+    displayChanges() {
+        const minPath = this.paths[this.minPathIndex];
+
+        new FieldDrawer(
+            canvas,
+            this.fieldCreator,
+        ).setVisited(this.fieldWalker.visited)
+        .setObstaclePositions(this.fieldCreator.obstaclePositions)
+        .setPath(minPath.map(node => node.direction))
+        .setEndPosition(this.fieldCreator.endPosition)
+        .setStartPosition(this.fieldCreator.startPosition)
+        .draw();
+    }
 }
 
-findPath();
-
-
-
-// drawField(canvas, field);
+new PathFinder(fieldCreator).findPath();
