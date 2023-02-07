@@ -59,6 +59,10 @@ class Canvas {
 }
 
 class FieldCreator {
+    static clearField(field) {
+        return field.map(row => row.map(() => 0));
+    }
+
     static EMPTY_CELL_WEIGHT = 1;
 
     constructor(width, height, startPosition, endPosition) {
@@ -67,7 +71,20 @@ class FieldCreator {
         this.startPosition = startPosition || this.getRadomPosition();
         this.endPosition = endPosition || this.getRadomPosition();
         this.field = this.createFieldAndFill();
-        this.obstaclePositions = [];
+    }
+
+    getObstaclesPositions() {
+        const obstaclePositions = [];
+
+        this.field.forEach((row, y) => {
+            row.forEach((cell, x) => {
+                if (cell !== FieldCreator.EMPTY_CELL_WEIGHT) {
+                    obstaclePositions.push([x, y]);
+                }
+            });
+        });
+    
+        return obstaclePositions;
     }
 
     createFieldAndFill(fill = FieldCreator.EMPTY_CELL_WEIGHT) {
@@ -75,23 +92,15 @@ class FieldCreator {
     }
 
     setRandomObstacles(count = 200, weight = Infinity) {
-        this.obstaclePositions = Array.from({ length: count }, () => this.getRadomPosition());
-
-        this.obstaclePositions = this.obstaclePositions.filter(position => {
+        for (let i = 0; i < count; i++) {
+            const position = this.getRadomPosition();
             const isOnStartPosition = this.isOnStartPosition(position);
             const isOnEndPosition = this.isOnEndPosition(position);
 
-            return !isOnStartPosition && !isOnEndPosition;
-        });
-            
-
-        this.setFieldObstaclesFromPositions(weight);
-    }
-
-    setFieldObstaclesFromPositions(weight = Infinity) {
-        this.field = this.createFieldAndFill();
-
-        this.obstaclePositions.forEach(([x, y]) => this.field[y][x] = weight);
+            if (!isOnStartPosition && !isOnEndPosition) {
+                this.field[position[1]][position[0]] = weight;
+            }
+        }
     }
 
     getRadomPosition() {
@@ -107,19 +116,18 @@ class FieldCreator {
     }
 
     isOnObstaclePosition([x, y]) {
-        return this.obstaclePositions.some(([obstacleX, obstacleY]) => obstacleX === x && obstacleY === y);
+        return this.field[y][x] !== FieldCreator.EMPTY_CELL_WEIGHT;
     }
         
-    
     zeros() {
         return this.createFieldAndFill(0);
     }
 }
 
 class FieldWalker {
-    constructor(fieldCreator) {
-        this.field = fieldCreator.field;
-        this.visited = new Int8Array(fieldCreator.field.length * fieldCreator.field[0].length);
+    constructor(field) {
+        this.field = field;
+        this.visited = new Int8Array(field.length * field[0].length);
     }
 
     init() {
@@ -347,16 +355,10 @@ class FieldDrawer {
 
     constructor(
         canvas,
-        fieldCreator,
+        initialField,
     ) {
         this.canvas = canvas;
-        this.fieldCreator = fieldCreator;
-
-        this.visited = [];
-        this.path = [];
-        this.obstaclePositions = [];
-
-        this.field = fieldCreator.zeros();
+        this.field = initialField;
     }
 
     fillField(positions, fill) {
@@ -409,7 +411,7 @@ class FieldDrawer {
     }
 
     clearField() {
-        this.field = this.fieldCreator.zeros();
+        this.field = FieldCreator.clearField(this.field);
     }
 
     draw() {
@@ -471,6 +473,20 @@ class PathFinder {
         const [bx, by] = b;
     
         return Math.abs(ax - bx) + Math.abs(ay - by);
+    }
+
+    static euclideanDistance = (a, b) => {
+        const [ax, ay] = a;
+        const [bx, by] = b;
+
+        return Math.sqrt(Math.pow(ax - bx, 2) + Math.pow(ay - by, 2));
+    }
+
+    static chebyshevDistance = (a, b) => {
+        const [ax, ay] = a;
+        const [bx, by] = b;
+
+        return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
     }
 
     constructor(fieldCreator, fieldDrawer, fieldWalker) {
@@ -611,7 +627,7 @@ class PathFinder {
 
         this.fieldDrawer
             .setVisited(this.fieldWalker.getVisitedPossitions())
-            .setObstaclePositions(this.fieldCreator.obstaclePositions)
+            .setObstaclePositions(this.fieldCreator.getObstaclesPositions())
             .setStartPosition(this.fieldCreator.startPosition)
             .setPossiblePaths(this.paths.flat().map(node => node.direction))
             .setPath(minPath.map(node => node.direction))
@@ -635,28 +651,8 @@ const fieldCreator = new FieldCreator(
 
 fieldCreator.setRandomObstacles(1000);
 
-// const testObstacles = [
-//     [1, 0],[1, 1],[1, 2],[1, 3],[1, 4],[1, 5],[1, 6],[1, 7],[1, 8],
-//     [1, 9],[1, 10],[1, 11],[1, 12],[4, 4],[4, 5],[4, 6],[4, 7],[4, 8],
-//     [4, 9],[4, 10],[4, 11],[4, 12],[4, 13],[4, 14],[4, 15],[4, 16],[4, 17],
-//     [4, 18],[4, 19],[4, 20],[4, 21],[4, 22],[4, 23],[4, 24],[4, 25],[4, 26],
-//     [4, 27],[4, 28],[4, 29],[7, 0],[7, 1],[7, 2],[7, 3],[7, 4],[7, 5],[7, 6],
-//     [7, 7],[7, 8],[7, 9],[7, 10],[7, 11],[7, 12],[7, 13],[7, 14],[7, 15],[7, 16],[7, 17],
-//     [7, 18],[7, 19],[7, 20],[7, 21],[7, 22],[7, 23],[10, 10],[10, 11],
-//     [10, 12],[10, 13],[10, 14],[10, 15],[10, 16],[10, 17],[10, 18],
-//     [10, 19],[10, 20],[10, 21],[10, 22],[10, 23],[11, 23],[12, 23],[12, 24],[12, 25],[13, 25],
-//     [14, 25],[14, 26],[14, 27],[14, 27],[14, 28],[13, 28],[13, 29],[12, 29],[11, 29],
-//     ...Array.from({ length: 24 }, (_, i) => [14, i]),
-//     ...Array.from({ length: 28 }, (_, i) => [18, 2 + i]),
-//     ...Array.from({ length: 26 }, (_, i) => [24, 2 + i]),
-//     ...Array.from({ length: 8 }, (_, i) => [19 + i, 17]),
-// ];
-
-// fieldCreator.obstaclePositions = testObstacles;
-// fieldCreator.setFieldObstaclesFromPositions();
-
-const fieldDrawer = new FieldDrawer(canvas, fieldCreator);
-const fieldWalker = new FieldWalker(fieldCreator);
+const fieldDrawer = new FieldDrawer(canvas, fieldCreator.zeros());
+const fieldWalker = new FieldWalker(fieldCreator.field);
 
 const pathFinder = new PathFinder(fieldCreator, fieldDrawer, fieldWalker);
 
