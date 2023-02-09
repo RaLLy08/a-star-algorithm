@@ -65,13 +65,94 @@ class FieldCreator {
 
     static EMPTY_CELL_WEIGHT = 1;
 
-    constructor(width, height, startPosition, endPosition) {
+    constructor(width, height, startPosition, endPosition, fieldWalker) {
         this.width = width;
         this.height = height;
         this.startPosition = startPosition || this.getRadomPosition();
         this.endPosition = endPosition || this.getRadomPosition();
         this.field = this.createFieldAndFill();
+
+
+        this.fieldWalker = null;
+        this.fieldDrawer = null;
+
+        this.isFinished = true;
+        this.mazePossitions = [];
     }
+
+    maze(fieldWalker, fieldDrawer, animate = false) {
+        this.fieldDrawer = fieldDrawer;
+        this.fieldWalker = fieldWalker;
+        this.fillField(Infinity);
+
+        this.mazePossitions = [
+            fieldCreator.startPosition,
+        ];
+        this.isFinished = false;
+        this.color = FieldDrawer.randomColorRgb();
+
+        if (animate) {
+            let loopInterval = null;
+
+            loopInterval = setInterval(() => {
+                this.mazeLoop();
+                this.displayMazeChanges();
+                
+                if (this.isFinished) {
+                    clearInterval(loopInterval);
+                    return;
+                }
+            });
+
+            return;
+        }
+    
+        while (!this.isFinished) { this.mazeLoop(); }
+
+        this.displayMazeChanges();
+    }
+
+    mazeLoop = () => {
+        if (!this.mazePossitions.length) {
+            this.isFinished = true;
+            return;
+        };
+
+        const directions = this.fieldWalker.getAviableDirections(
+            this.mazePossitions.at(-1)
+        )
+        
+        this.fieldWalker.visit(this.mazePossitions.at(-1));
+
+        if (directions.length === 0) {
+            this.mazePossitions.pop();
+            this.color = FieldDrawer.randomColorRgb();
+
+            return;
+        }
+
+        const newIndex = Math.floor(Math.random() * directions.length);
+
+        const newPossition = directions[newIndex].direction;
+
+        const rest = directions.filter((_, i) => i !== newIndex).map(node => node.direction);
+
+        rest[0] && this.fieldWalker.visit(rest[0]);
+
+        newPossition.color = this.color;
+
+        this.mazePossitions.push(newPossition);
+
+        fieldCreator.field[newPossition[1]][newPossition[0]] = FieldCreator.EMPTY_CELL_WEIGHT;
+    }
+
+    displayMazeChanges() {
+        this.fieldDrawer.clearField();
+        this.fieldDrawer.setVisited(this.fieldWalker.getVisitedPossitions());
+        this.fieldDrawer.setObstaclePositions(this.getObstaclesPositions());
+        this.fieldDrawer.setMazeBackPath(this.mazePossitions).draw();
+    }
+    
 
     getObstaclesPositions() {
         const obstaclePositions = [];
@@ -89,6 +170,13 @@ class FieldCreator {
 
     createFieldAndFill(fill = FieldCreator.EMPTY_CELL_WEIGHT) {
         return Array.from({ length: this.height }, () => Array.from({ length: this.width }, () => fill));
+    }
+
+    fillField(fill = FieldCreator.EMPTY_CELL_WEIGHT) {
+        this.field = this.createFieldAndFill(fill);
+
+        this.field[this.startPosition[1]][this.startPosition[0]] = FieldCreator.EMPTY_CELL_WEIGHT;
+        this.field[this.endPosition[1]][this.endPosition[0]] = FieldCreator.EMPTY_CELL_WEIGHT;
     }
 
     setRandomObstacles(count = 200, weight = Infinity) {
@@ -118,16 +206,19 @@ class FieldCreator {
     isOnObstaclePosition([x, y]) {
         return this.field[y][x] !== FieldCreator.EMPTY_CELL_WEIGHT;
     }
-        
-    zeros() {
-        return this.createFieldAndFill(0);
-    }
 }
 
 class FieldWalker {
-    constructor(field) {
+    constructor(field, {
+        skipInfinityNeighbors = false,
+        disableDiagonals = false,
+        disableCross = false,
+    } = {}) {
         this.field = field;
         this.visited = new Int8Array(field.length * field[0].length);
+        this.skipInfinityNeighbors = skipInfinityNeighbors;
+        this.disableDiagonals = disableDiagonals;
+        this.disableCross = disableCross;
     }
 
     init() {
@@ -302,30 +393,36 @@ class FieldWalker {
         return result;
     }
 
-    getAviableDirections(position) {
-        const isVisited = this.visited[position[0] + position[1] * this.field[0].length];
-        
-        const result = []
+    isVisited(position) {
+        return this.visited[position[0] + position[1] * this.field[0].length];
+    }
 
-        if (isVisited) {
-            return result;
-        }
-
+    visit(position) {
         this.visited[position[0] + position[1] * this.field[0].length] = 1;
+    }
+
+
+    getAviableDirections(position) {
+        const result = [];
 
         const up = this.getUp(position);
         const down = this.getDown(position);
         const left = this.getLeft(position);
         const right = this.getRight(position);
 
-        result.push(up);
-        result.push(down);
-        result.push(left);
-        result.push(right);
-        result.push(this.getLeftTopDiagonal(position, left.weight, up.weight));
-        result.push(this.getRightTopDiagonal(position, right.weight, up.weight));
-        result.push(this.getLeftBottomDiagonal(position, left.weight, down.weight));
-        result.push(this.getRightBottomDiagonal(position, right.weight, down.weight));
+        if (!this.disableCross) {
+            result.push(up);
+            result.push(down);
+            result.push(left);
+            result.push(right);
+        }
+
+        if (!this.disableDiagonals) {
+            result.push(this.getLeftTopDiagonal(position, left.weight, up.weight));
+            result.push(this.getRightTopDiagonal(position, right.weight, up.weight));
+            result.push(this.getLeftBottomDiagonal(position, left.weight, down.weight));
+            result.push(this.getRightBottomDiagonal(position, right.weight, down.weight));
+        }
 
         return result.filter(node => {
             // filter undefined nodes
@@ -333,8 +430,8 @@ class FieldWalker {
                 return false;
             }
 
-            // filter unreachable nodes
-            if (node.weight === Infinity) {
+            // skip calclulation for unreachable nodes for optimization
+            if (this.skipInfinityNeighbors && node.weight === Infinity) {
                 return false;
             }
 
@@ -353,12 +450,34 @@ class FieldDrawer {
     static START = 'start';
     static END = 'end';
 
+    static randomColorRgb = () => {
+        const random = () => Math.floor(Math.random() * 255);
+    
+        return {
+            r: random(),
+            g: random(),
+            b: random(),
+        }
+    }
+
     constructor(
         canvas,
-        initialField,
+        fieldForShape,
     ) {
         this.canvas = canvas;
-        this.field = initialField;
+        this.field = fieldForShape;
+
+        this.clearField();
+    }
+
+    clearField() {
+        this.field = this.field.map(row => row.map(cell => (
+            {
+                r: 255,
+                g: 255,
+                b: 255,
+            }
+        )));
     }
 
     fillField(positions, fill) {
@@ -366,6 +485,16 @@ class FieldDrawer {
             const [x, y] = position;
 
             this.field[y][x] = fill;
+        });
+
+        return this;
+    }
+
+    setMazeBackPath(backPath) {
+        backPath.forEach(position => {
+            const [x, y] = position;
+
+            this.field[y][x] = position.color;
         });
 
         return this;
@@ -410,10 +539,6 @@ class FieldDrawer {
         return this;
     }
 
-    clearField() {
-        this.field = FieldCreator.clearField(this.field);
-    }
-
     draw() {
         canvas.clear();
 
@@ -434,7 +559,9 @@ class FieldDrawer {
     
                 if (cell === FieldDrawer.VISITED) {
                     // fillColor = { r: 200, g: 200, b: 200 };
-                    this.canvas.strokeRect(j * cellWidth, i * cellHeight, cellWidth, cellHeight, { r: 0, g: 0, b: 0}, 0.5);    
+                    this.canvas.strokeRect(j * cellWidth, i * cellHeight, cellWidth, cellHeight, { r: 0, g: 0, b: 0}, 0.5);  
+                    
+                    continue;
                 }
     
                 if (cell === FieldDrawer.PATH) {
@@ -457,9 +584,12 @@ class FieldDrawer {
                 if (cell === FieldDrawer.END) {
                     fillColor = { r: 205, g: 55, b: 85 };
                 }
+
                 
                 if (fillColor) {
                     this.canvas.drawRect(j * cellWidth, i * cellHeight, cellWidth, cellHeight, fillColor);
+                } else {
+                    this.canvas.drawRect(j * cellWidth, i * cellHeight, cellWidth, cellHeight, cell);
                 }
             }
         }
@@ -499,7 +629,6 @@ class PathFinder {
         this.paths = [];
         this.minPathIndex = null;
         this.isFinished = false;
-        this.isStarted = false;
 
         this.init();
     }
@@ -516,8 +645,16 @@ class PathFinder {
 
         for (let i = 0; i < this.paths.length; i++) {
             const path = this.paths[i];
-            const lastNode = path[path.length - 1];
-            const pathLength = path.length + this.heuristics(lastNode.direction, this.fieldCreator.endPosition);
+            const lastNode = path.at(-1);
+
+            let sum = 0;
+
+            for (let j = 0; j < path.length; j++) {
+                const node = path[j];
+                sum += node.weight;
+            }
+
+            const pathLength = sum + this.heuristics(lastNode.direction, this.fieldCreator.endPosition);
 
             if (pathLength < minPathLength) {
                 minPathIndex = i;
@@ -592,7 +729,14 @@ class PathFinder {
 
         const minPath = this.getMinPath();
 
-        const minPathTail = minPath[minPath.length - 1];
+        if (this.minPathIndex === null) {
+            this.stopLoop();
+            this.keepOnlyMinPath();
+
+            return;
+        }
+
+        const minPathTail = minPath.at(-1);
 
         if (this.fieldCreator.isOnEndPosition(minPathTail.direction)) {
             this.stopLoop();
@@ -600,6 +744,14 @@ class PathFinder {
 
             return;
         }
+
+        if (this.fieldWalker.isVisited(minPathTail.direction)) {
+            this.paths.splice(this.minPathIndex, 1);
+
+            return;
+        }
+
+        this.fieldWalker.visit(minPathTail.direction);
 
         const nextNodes = this.fieldWalker.getAviableDirections(minPathTail.direction);
 
@@ -627,11 +779,11 @@ class PathFinder {
 
         this.fieldDrawer
             .setVisited(this.fieldWalker.getVisitedPossitions())
-            .setObstaclePositions(this.fieldCreator.getObstaclesPositions())
             .setStartPosition(this.fieldCreator.startPosition)
             .setPossiblePaths(this.paths.flat().map(node => node.direction))
             .setPath(minPath.map(node => node.direction))
             .setEndPosition(this.fieldCreator.endPosition)
+            .setObstaclePositions(this.fieldCreator.getObstaclesPositions())
             .draw();
     }
 
@@ -646,15 +798,30 @@ const canvas = new Canvas(document.getElementById("canvas"));
 const fieldCreator = new FieldCreator(
     60, 60, 
     [0, 0], 
-    [21, 22]
+    [59, 59]
 );
 
-fieldCreator.setRandomObstacles(1000);
+const fieldDrawer = new FieldDrawer(canvas, fieldCreator.field);
 
-const fieldDrawer = new FieldDrawer(canvas, fieldCreator.zeros());
-const fieldWalker = new FieldWalker(fieldCreator.field);
 
-const pathFinder = new PathFinder(fieldCreator, fieldDrawer, fieldWalker);
+const mazeFieldWalker = new FieldWalker(fieldCreator.field, {
+    disableDiagonals: true,
+});
+
+
+const randomObstaclesChance = Math.random();
+
+if (randomObstaclesChance < 0.2) {
+    fieldCreator.setRandomObstacles(1000, Infinity);
+} else {
+    fieldCreator.maze(mazeFieldWalker, fieldDrawer);
+}
+
+const pathFinderfieldWalker = new FieldWalker(fieldCreator.field, {
+    skipInfinityNeighbors: true,
+});
+
+const pathFinder = new PathFinder(fieldCreator, fieldDrawer, pathFinderfieldWalker);
 
 pathFinder.findPath();
 
@@ -671,13 +838,12 @@ const getPossitionFromMouse = (e) => {
     return [x, y];
 }
 
-
 let mousePosition = [0, 0];
 
 canvas.canvas.onmousemove = (e) => {
     const position = getPossitionFromMouse(e);
 
-    if (!pathFinder.isFinished) {
+    if (!pathFinder.isFinished || !fieldCreator.isFinished) {
         return;
     }
 
@@ -695,7 +861,7 @@ canvas.canvas.onmousemove = (e) => {
 
     fieldCreator.endPosition = position;
 
-    fieldWalker.init();
+    pathFinderfieldWalker.init();
     pathFinder.init();
 
     pathFinder.findPath();
@@ -704,10 +870,9 @@ canvas.canvas.onmousemove = (e) => {
 canvas.canvas.onmousedown = (e) => {
     const position = getPossitionFromMouse(e);
 
-    if (!pathFinder.isFinished) {
+    if (!pathFinder.isFinished || !fieldCreator.isFinished) {
         return;
     }
-
 
     if (fieldCreator.isOnObstaclePosition(position)) {
         return;
@@ -716,8 +881,20 @@ canvas.canvas.onmousedown = (e) => {
 
     fieldCreator.endPosition = position;
 
-    fieldWalker.init();
+    pathFinderfieldWalker.init();
     pathFinder.init();
 
     pathFinder.findPath(true);
 }
+
+// bug
+// document.getElementById("generate-maze").onclick = () => {
+
+//     if (!pathFinder.isFinished || !fieldCreator.isFinished) return;
+
+//     pathFinderfieldWalker.init();
+//     pathFinder.init();
+//     mazeFieldWalker.init();
+
+//     fieldCreator.maze(mazeFieldWalker, fieldDrawer);
+// }
